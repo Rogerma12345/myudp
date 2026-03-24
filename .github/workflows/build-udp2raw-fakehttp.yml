@@ -1,0 +1,64 @@
+name: build-udp2raw-fakehttp
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential clang flex bison g++ gawk \
+            gcc-multilib g++-multilib gettext git libncurses5-dev \
+            libssl-dev python3-distutils rsync unzip zlib1g-dev \
+            file wget curl ca-certificates
+
+      - name: Clone buildroot
+        run: |
+          git clone --depth=1 -b openwrt-21.02 https://github.com/hanwckf/immortalwrt-mt798x.git buildroot
+
+      - name: Update feeds
+        working-directory: buildroot
+        run: |
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Copy custom package
+        run: |
+          mkdir -p buildroot/package/custom/udp2raw-fakehttp
+          cp -f custom-packages/udp2raw-fakehttp/Makefile buildroot/package/custom/udp2raw-fakehttp/Makefile
+
+      - name: Prepare config
+        working-directory: buildroot
+        run: |
+          cat > .config << 'EOF'
+          CONFIG_TARGET_mediatek=y
+          CONFIG_TARGET_mediatek_mt7981=y
+          CONFIG_TARGET_mediatek_mt7981_DEVICE_cetron_ct3003=y
+          CONFIG_PACKAGE_udp2raw-fakehttp=m
+          EOF
+          make defconfig
+
+      - name: Build package
+        working-directory: buildroot
+        run: |
+          make package/udp2raw-fakehttp/compile V=s -j"$(nproc)"
+
+      - name: Collect ipk
+        run: |
+          mkdir -p artifacts
+          find buildroot/bin/packages -type f -name "udp2raw-fakehttp*.ipk" -exec cp -f {} artifacts/ \;
+          find buildroot/bin/targets -type f -name "packages.manifest" -exec cp -f {} artifacts/ \; || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: udp2raw-fakehttp-ipk
+          path: artifacts/*
