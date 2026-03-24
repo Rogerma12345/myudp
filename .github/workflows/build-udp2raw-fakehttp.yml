@@ -47,7 +47,8 @@ jobs:
       - name: Copy custom package
         run: |
           mkdir -p buildroot/package/custom/udp2raw-fakehttp
-          cp -f custom-packages/udp2raw-fakehttp/Makefile buildroot/package/custom/udp2raw-fakehttp/Makefile
+          cp -f custom-packages/udp2raw-fakehttp/Makefile \
+                buildroot/package/custom/udp2raw-fakehttp/Makefile
 
       - name: Prepare config
         working-directory: buildroot
@@ -59,6 +60,18 @@ jobs:
           EOF
           make defconfig
           grep -E '^(CONFIG_TARGET_|CONFIG_PACKAGE_udp2raw-fakehttp=)' .config || true
+
+      - name: Build tools and toolchain first
+        working-directory: buildroot
+        run: |
+          make tools/install -j"$(nproc)" V=s
+          make toolchain/install -j"$(nproc)" V=s
+
+      - name: Verify musl loader exists
+        working-directory: buildroot
+        run: |
+          find staging_dir -path '*toolchain-*musl/lib/ld-musl-*' -ls
+          ls -lah staging_dir/toolchain-*_musl/lib/ || true
 
       - name: Build package
         working-directory: buildroot
