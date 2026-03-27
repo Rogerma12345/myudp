@@ -34,7 +34,7 @@ jobs:
       - name: Resolve FakeSIP ref
         id: ref
         run: |
-          REF="${{ github.event.inputs.fakesip_ref || 'main' }}"
+          REF="${{ github.event.inputs.fakesip_ref || 'master' }}"
           echo "fakesip_ref=${REF}" >> "$GITHUB_OUTPUT"
 
           DAYS="${{ github.event.inputs.retention_days || '7' }}"
