@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         nftables \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /build/fakesip /usr/local/bin/fakesip
+COPY --from=builder /build/build/fakesip /usr/local/bin/fakesip
 
 ENTRYPOINT ["fakesip"]
 CMD ["--help"]
