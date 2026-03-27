@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
         libnetfilter-queue-dev \
         libnfnetlink-dev \
+        libmnl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -25,6 +26,7 @@ RUN make
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        libmnl0 \
         libnetfilter-queue1 \
         libnfnetlink0 \
         iptables \
