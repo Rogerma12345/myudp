@@ -1,0 +1,86 @@
+name: Build FakeSIP Docker Image (Artifact)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docker/fakesip/**'
+      - '.github/workflows/build-fakesip.yml'
+  workflow_dispatch:
+    inputs:
+      fakesip_ref:
+        description: 'FakeSIP upstream git ref (branch / tag / commit SHA)'
+        required: false
+        default: 'main'
+      retention_days:
+        description: 'Artifact 保留天数 (1–90)'
+        required: false
+        default: '7'
+
+jobs:
+  build:
+    name: Build FakeSIP Image → Artifact tar
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read      # 只需读仓库，无需 packages 权限
+
+    steps:
+      # ── 1. 检出仓库 ──────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. 决定上游 FakeSIP 版本 ─────────────────────────────────
+      - name: Resolve FakeSIP ref
+        id: ref
+        run: |
+          REF="${{ github.event.inputs.fakesip_ref || 'main' }}"
+          echo "fakesip_ref=${REF}" >> "$GITHUB_OUTPUT"
+
+          DAYS="${{ github.event.inputs.retention_days || '7' }}"
+          echo "retention_days=${DAYS}" >> "$GITHUB_OUTPUT"
+
+      # ── 3. 设置 Docker Buildx ────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── 4. 构建镜像（加载到本地，不推送）────────────────────────
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/fakesip
+          file: docker/fakesip/Dockerfile
+          platforms: linux/amd64          # load 模式只支持单架构
+          push: false
+          load: true
+          tags: fakesip:latest
+          build-args: |
+            PKG_SOURCE_VERSION=${{ steps.ref.outputs.fakesip_ref }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── 5. 导出为 tar.gz ─────────────────────────────────────────
+      - name: Export image as tar.gz
+        run: |
+          docker save fakesip:latest | gzip > fakesip-${{ steps.ref.outputs.fakesip_ref }}.tar.gz
+          echo "FILE=fakesip-${{ steps.ref.outputs.fakesip_ref }}.tar.gz" >> "$GITHUB_ENV"
+
+      # ── 6. 上传为 Actions Artifact ───────────────────────────────
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fakesip-image-${{ steps.ref.outputs.fakesip_ref }}-${{ github.run_number }}
+          path: ${{ env.FILE }}
+          retention-days: ${{ steps.ref.outputs.retention_days }}
+          compression-level: 0          # 已经是 gzip，跳过二次压缩
+
+      # ── 7. 打印使用说明 ──────────────────────────────────────────
+      - name: Usage hint
+        run: |
+          echo "✅ 构建完成"
+          echo ""
+          echo "下载 Artifact 后本地导入："
+          echo "  docker load < ${{ env.FILE }}"
+          echo ""
+          echo "运行（需要 NET_ADMIN 权限）："
+          echo "  docker run --rm --cap-add NET_ADMIN --network host fakesip:latest -p 5060 -i eth0"
