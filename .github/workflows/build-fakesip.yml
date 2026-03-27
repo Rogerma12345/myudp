@@ -11,7 +11,7 @@ on:
       fakesip_ref:
         description: 'FakeSIP upstream git ref (branch / tag / commit SHA)'
         required: false
-        default: 'main'
+        default: 'master'
       retention_days:
         description: 'Artifact 保留天数 (1–90)'
         required: false
